@@ -2,17 +2,351 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vilesheed Hikaye</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: Georgia, serif;
+      max-width: 850px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.8;
+      color: #222;
+      background: #fff;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .story-paragraph {
+      position: relative;
+      margin-bottom: 25px;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .story-paragraph:hover {
+      background: #fafafa;
+    }
+
+    .comment-box {
+      margin-top: 10px;
+      padding: 12px;
+      border-left: 3px solid #888;
+      background: #f7f7f7;
+      border-radius: 6px;
+    }
+
+    .comment {
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .nickname {
+      font-weight: bold;
+    }
+
+    .comment-form {
+      margin-top: 12px;
+      padding: 15px;
+      background: #f1f1f1;
+      border-radius: 8px;
+    }
+
+    input, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      margin: 5px 0 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-family: inherit;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #222;
+      color: white;
+    }
+
+    .comment-count {
+      font-size: 13px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    #status {
+      text-align: center;
+      color: #777;
+      margin-bottom: 20px;
+    }
+  </style>
 </head>
+
 <body>
 
-<h1>Hypothesis Test</h1>
+  <h1>Vilesheed Hikaye</h1>
 
-<p>Bu benim ilk test cümlem. Bu cümleyi seçip yorum yapabilmelisin.</p>
+  <div id="status">Yorum sistemi hazırlanıyor...</div>
 
-<p>İkinci test cümlesi burada. Bunu da seçip ayrı bir yorum bırakabilmelisin.</p>
+  <div id="story">
 
-<script src="https://hypothes.is/embed.js" async></script>
+    <div class="story-paragraph" data-anchor-id="paragraf-1">
+      Bu benim ilk test cümlem. Bu cümleyi seçip yorum yapabilmelisin.
+      <div class="comment-count"></div>
+      <div class="comment-box"></div>
+    </div>
+
+    <div class="story-paragraph" data-anchor-id="paragraf-2">
+      İkinci test cümlesi burada. Bunu da seçip ayrı bir yorum bırakabilmelisin.
+      <div class="comment-count"></div>
+      <div class="comment-box"></div>
+    </div>
+
+  </div>
+
+<script>
+
+  /* ==============================
+     SUPABASE BAĞLANTISI
+     ============================== */
+
+  const SUPABASE_URL =
+    "https://xhjtffprcrpidenqmgbs.supabase.co";
+
+  const SUPABASE_PUBLISHABLE_KEY =
+    "sb_publishable_B38zROMI-XXsYcFKBVNILA_FwrYvqFd";
+
+  const supabase = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+  );
+
+
+  /* ==============================
+     ANONİM KULLANICI
+     ============================== */
+
+  async function startAnonymousUser() {
+
+    const { data, error } =
+      await supabase.auth.signInAnonymously();
+
+    if (error) {
+      console.error(error);
+      document.getElementById("status").textContent =
+        "Yorum sistemi başlatılamadı.";
+      return;
+    }
+
+    document.getElementById("status").textContent =
+      "Yorum sistemi hazır.";
+
+    loadComments();
+  }
+
+
+  /* ==============================
+     YORUMLARI GETİR
+     ============================== */
+
+  async function loadComments() {
+
+    const { data, error } = await supabase
+      .from("comments")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    document
+      .querySelectorAll(".story-paragraph")
+      .forEach(paragraph => {
+
+        const anchorId =
+          paragraph.dataset.anchorId;
+
+        const comments =
+          data.filter(c => c.anchor_id === anchorId);
+
+        const box =
+          paragraph.querySelector(".comment-box");
+
+        const count =
+          paragraph.querySelector(".comment-count");
+
+        box.innerHTML = "";
+
+        if (comments.length > 0) {
+
+          count.textContent =
+            "💬 " + comments.length + " yorum";
+
+          comments.forEach(c => {
+
+            const div =
+              document.createElement("div");
+
+            div.className = "comment";
+
+            div.innerHTML =
+              "<span class='nickname'>" +
+              escapeHtml(c.Nickname) +
+              "</span>: " +
+              escapeHtml(c.comment);
+
+            box.appendChild(div);
+          });
+
+        } else {
+
+          count.textContent = "";
+
+        }
+
+      });
+  }
+
+
+  /* ==============================
+     SEÇİLEN PARAGRAFA YORUM
+     ============================== */
+
+  document.addEventListener("mouseup", function() {
+
+    const selection =
+      window.getSelection();
+
+    const selectedText =
+      selection.toString().trim();
+
+    if (!selectedText) return;
+
+    let node =
+      selection.anchorNode;
+
+    if (!node) return;
+
+    const paragraph =
+      node.parentElement.closest(".story-paragraph");
+
+    if (!paragraph) return;
+
+    const oldForm =
+      document.querySelector(".comment-form");
+
+    if (oldForm) oldForm.remove();
+
+    const form =
+      document.createElement("div");
+
+    form.className = "comment-form";
+
+    form.innerHTML = `
+      <strong>Seçtiğin bölüme yorum yap:</strong>
+
+      <p style="font-size:13px;color:#666;">
+        “${escapeHtml(selectedText)}”
+      </p>
+
+      <input
+        id="nickname-input"
+        placeholder="Takma adın"
+        maxlength="30"
+      >
+
+      <textarea
+        id="comment-input"
+        placeholder="Yorumunu yaz..."
+        rows="3"
+      ></textarea>
+
+      <button id="send-comment">
+        Yorumu gönder
+      </button>
+    `;
+
+    paragraph.appendChild(form);
+
+    document
+      .getElementById("send-comment")
+      .addEventListener("click", async function() {
+
+        const nickname =
+          document
+            .getElementById("nickname-input")
+            .value.trim();
+
+        const comment =
+          document
+            .getElementById("comment-input")
+            .value.trim();
+
+        if (!nickname || !comment) {
+          alert("Takma ad ve yorum gerekli.");
+          return;
+        }
+
+        const anchorId =
+          paragraph.dataset.anchorId;
+
+        const { error } =
+          await supabase
+            .from("comments")
+            .insert({
+              Nickname: nickname,
+              comment: comment,
+              anchor_id: anchorId
+            });
+
+        if (error) {
+          console.error(error);
+          alert("Yorum gönderilemedi.");
+          return;
+        }
+
+        form.remove();
+
+        selection.removeAllRanges();
+
+        await loadComments();
+
+      });
+
+  });
+
+
+  /* ==============================
+     GÜVENLİ METİN
+     ============================== */
+
+  function escapeHtml(text) {
+
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+  }
+
+
+  startAnonymousUser();
+
+</script>
 
 </body>
 </html>
